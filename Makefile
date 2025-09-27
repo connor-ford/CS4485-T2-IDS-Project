@@ -44,3 +44,8 @@ docker-run:
 # utility
 clean:
 	rm -rf .venv $(ARTIFACTS) __pycache__ $(BACKEND)/**/__pycache__
+
+# schema
+
+schema:
+	@curl -s http://127.0.0.1:8000/schema | jq
