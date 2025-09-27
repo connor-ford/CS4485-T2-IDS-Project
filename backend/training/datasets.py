@@ -1,5 +1,4 @@
-from __future__ import annotations
-from typing import Tuple, List, Dict
+import numpy as np
 import pandas as pd
 from pathlib import Path
 from sklearn.model_selection import train_test_split
@@ -7,13 +6,21 @@ from sklearn.model_selection import train_test_split
 
 def load_dataset(cfg):
     root = Path(cfg["data_root"])
-    # example: single CSV; if you have multiple, concat them
     df = pd.read_csv(root / "CICIDS2017_sample.csv")
-    # ensure numeric dtypes where applicable
+
+    tgt = cfg["target_col"]
+
+    # force numerics on features (leave target as-is)
     for c in df.columns:
-        if c != cfg["target_col"]:
+        if c != tgt:
             df[c] = pd.to_numeric(df[c], errors="coerce")
+
+    # replace +/-inf created by parsing or later ops
+    df.replace([np.inf, -np.inf], np.nan, inplace=True)
+
+    # fill remaining NaNs (simple baseline)
     df = df.fillna(0)
+
     return df
 
 
