@@ -1,7 +1,14 @@
+import os
+import joblib
 from flask import Flask, request, jsonify
 from models import MODEL_REGISTRY
 
 app = Flask(__name__)
+
+# where artifacts live; override with IDSML_ARTIFACTS_DIR
+ART_DIR = os.getenv(
+    "IDSML_ARTIFACTS_DIR", os.path.join(os.path.dirname(__file__), "artifacts")
+)
 
 
 @app.route("/health", methods=["GET"])
@@ -37,6 +44,54 @@ def predict():
         return jsonify({"model": model_name, "prediction": pred, "meta": meta or {}})
     except Exception as e:
         return jsonify({"error": f"inference failed: {type(e).__name__}: {e}"}), 400
+
+
+@app.get("/schema")
+def schema():
+    """Return the active feature schema and class labels."""
+    features_path = os.path.join(ART_DIR, "features.pkl")
+    classes_path = os.path.join(ART_DIR, "classes.pkl")
+
+    # fail fast with clear errors
+    missing = [p for p in [features_path, classes_path] if not os.path.exists(p)]
+    if missing:
+        return (
+            jsonify(
+                {
+                    "error": "schema artifacts not found",
+                    "missing": missing,
+                    "artifacts_dir": ART_DIR,
+                }
+            ),
+            500,
+        )
+
+    features = joblib.load(features_path)
+    classes = joblib.load(classes_path)
+    return jsonify(
+        {
+            "artifacts_dir": ART_DIR,
+            "features": features,  # ordered list
+            "classes": classes,  # label order matches predict_proba indices
+            "models": sorted(MODEL_REGISTRY.keys()),
+        }
+    )
+
+
+@app.get("/schema/<what>")
+def schema_part(what: str):
+    if what not in ("features", "classes"):
+        return (
+            jsonify({"error": "use /schema, /schema/features, or /schema/classes"}),
+            400,
+        )
+    path = os.path.join(ART_DIR, f"{what}.pkl")
+    if not os.path.exists(path):
+        return (
+            jsonify({"error": f"{what}.pkl not found", "artifacts_dir": ART_DIR}),
+            500,
+        )
+    return jsonify({what: joblib.load(path)})
 
 
 if __name__ == "__main__":
