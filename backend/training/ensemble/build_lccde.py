@@ -5,7 +5,7 @@ from typing import Dict
 from sklearn.metrics import classification_report
 
 from ..datasets import load_dataset, select_features, split_sets
-from ..common import save_artifacts
+from ..common import save_artifacts, ensure_dir
 
 
 def build_lccde(cfg: Dict, out_root: str) -> None:
@@ -14,14 +14,14 @@ def build_lccde(cfg: Dict, out_root: str) -> None:
     Assumes all base models were trained with the same label encoder and
     that features.pkl/classes.pkl exist in artifacts/<dataset>/.
     """
-    out_dir = f"{out_root}/{cfg['dataset']}"
 
     # load base models + schema
+    out_dir = ensure_dir(out_root)
     xgb = joblib.load(f"{out_dir}/xgb.pkl")
     lgbm = joblib.load(f"{out_dir}/lgbm.pkl")
     cat = joblib.load(f"{out_dir}/catboost.pkl")
     features = joblib.load(f"{out_dir}/features.pkl")
-    classes = joblib.load(f"{out_dir}/classes.pkl")  # string labels in encoded order
+    classes = joblib.load(f"{out_dir}/classes.pkl")
 
     # load data & make validation split once
     df = load_dataset(cfg)

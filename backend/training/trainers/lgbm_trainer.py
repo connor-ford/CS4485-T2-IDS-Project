@@ -41,8 +41,7 @@ def train_lgbm(cfg: Dict, out_root: str) -> None:
     val_pred = le.inverse_transform(clf.predict(Xva).astype(int))
     test_pred = le.inverse_transform(clf.predict(Xte).astype(int))
 
-    out_dir = f"{out_root}/{cfg['dataset']}"
-    ensure_dir(out_dir)
+    out_dir = ensure_dir(out_root)
     dump_report(yva, val_pred, f"{out_dir}/lgbm_val_report.json")
     dump_report(yte, test_pred, f"{out_dir}/lgbm_test_report.json")
 

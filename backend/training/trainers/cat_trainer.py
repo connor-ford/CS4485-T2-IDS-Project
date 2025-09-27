@@ -39,8 +39,7 @@ def train_cat(cfg: Dict, out_root: str) -> None:
     val_pred = le.inverse_transform(clf.predict(Xva).astype(int).ravel())
     test_pred = le.inverse_transform(clf.predict(Xte).astype(int).ravel())
 
-    out_dir = f"{out_root}/{cfg['dataset']}"
-    ensure_dir(out_dir)
+    out_dir = ensure_dir(out_root)
     dump_report(yva, val_pred, f"{out_dir}/catboost_val_report.json")
     dump_report(yte, test_pred, f"{out_dir}/catboost_test_report.json")
 
