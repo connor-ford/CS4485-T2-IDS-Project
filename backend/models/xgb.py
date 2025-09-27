@@ -1,21 +1,17 @@
-from typing import Any, Dict, Tuple, List
+from typing import Any, Dict, List
 import joblib
 import numpy as np
 import pandas as pd
-from xgboost import XGBClassifier
 from .base import BaseModelRunner
-from .common import TabularPreprocessor
 
 MODEL_NAME = "xgb"
-
-FEATURES: List[str] = []  # set exactly to the notebook’s feature columns
 
 
 class _XGBRunner(BaseModelRunner):
     def __init__(self):
         self.model = joblib.load("/app/artifacts/xgb.pkl")
-        self.prep: TabularPreprocessor = joblib.load("/app/artifacts/xgb_prep.pkl")
-        self.features = FEATURES
+        self.features: List[str] = joblib.load("/app/artifacts/features.pkl")
+        self.classes: List[str] = joblib.load("/app/artifacts/classes.pkl")  # <-- add
 
     def validate(self, inputs: Dict[str, Any]) -> None:
         missing = [f for f in self.features if f not in inputs]
@@ -24,10 +20,10 @@ class _XGBRunner(BaseModelRunner):
 
     def _predict_impl(self, inputs: Dict[str, Any]) -> Any:
         x = pd.DataFrame([{f: inputs[f] for f in self.features}])
-        x = self.prep.transform(x)
-        proba = self.model.predict_proba(x)[0]
-        pred = self.model.classes_[int(np.argmax(proba))]
-        return {"label": str(pred), "proba": proba.tolist()}
+        proba = self.model.predict_proba(x)[0]  # shape (num_classes,)
+        idx = int(np.argmax(proba))
+        label = self.classes[idx]  # map ID -> original string
+        return {"label": str(label), "proba": proba.tolist()}
 
 
 RUNNER = _XGBRunner()

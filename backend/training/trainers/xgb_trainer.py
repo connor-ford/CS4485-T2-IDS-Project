@@ -1,26 +1,23 @@
 from __future__ import annotations
 from typing import Dict
 from xgboost import XGBClassifier
+from sklearn.preprocessing import LabelEncoder
 
 from ..datasets import load_dataset, select_features, split_sets
 from ..common import save_artifacts, dump_report, ensure_dir
 
 
 def train_xgb(cfg: Dict, out_root: str) -> None:
-    """
-    Train an XGBoost multi-class classifier using the dataset/config provided.
-    Artifacts saved to: {out_root}/{cfg['dataset']}/
-      - xgb.pkl
-      - features.pkl
-      - xgb_val_report.json
-      - xgb_test_report.json
-    """
-    # load & prepare data
     df = load_dataset(cfg)
     X, y, features = select_features(df, cfg["target_col"])
     Xtr, ytr, Xva, yva, Xte, yte = split_sets(X, y, cfg["split"])
 
-    # model params from YAML (with defaults if missing)
+    # encode string labels -> ints
+    le = LabelEncoder().fit(y)
+    ytr_enc = le.transform(ytr)
+    yva_enc = le.transform(yva)
+    yte_enc = le.transform(yte)
+
     mcfg = cfg.get("models", {}).get("xgb", {})
     params = {
         "n_estimators": mcfg.get("n_estimators", 500),
@@ -33,15 +30,25 @@ def train_xgb(cfg: Dict, out_root: str) -> None:
         "objective": "multi:softprob",
         "random_state": cfg["split"]["random_state"],
         "n_jobs": mcfg.get("n_jobs", -1),
+        # optional but explicit:
+        "num_class": len(le.classes_),
     }
 
     clf = XGBClassifier(**params)
-    clf.fit(Xtr, ytr)
+    clf.fit(Xtr, ytr_enc)
 
-    # reports + artifacts
+    # human-readable reports: inverse-transform predictions to original string labels
+    import numpy as np
+
+    val_pred_enc = clf.predict(Xva)
+    test_pred_enc = clf.predict(Xte)
+    val_pred = le.inverse_transform(val_pred_enc.astype(int))
+    test_pred = le.inverse_transform(test_pred_enc.astype(int))
+
     out_dir = f"{out_root}/{cfg['dataset']}"
     ensure_dir(out_dir)
-    dump_report(yva, clf.predict(Xva), f"{out_dir}/xgb_val_report.json")
-    dump_report(yte, clf.predict(Xte), f"{out_dir}/xgb_test_report.json")
+    dump_report(yva, val_pred, f"{out_dir}/xgb_val_report.json")
+    dump_report(yte, test_pred, f"{out_dir}/xgb_test_report.json")
 
-    save_artifacts(out_dir, xgb=clf, features=features)
+    # save estimator, features, and classes (for inference mapping)
+    save_artifacts(out_dir, xgb=clf, features=features, classes=list(le.classes_))

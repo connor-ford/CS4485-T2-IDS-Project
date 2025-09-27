@@ -1,26 +1,23 @@
 from __future__ import annotations
 from typing import Dict
 from catboost import CatBoostClassifier
+from sklearn.preprocessing import LabelEncoder
 
 from ..datasets import load_dataset, select_features, split_sets
 from ..common import save_artifacts, dump_report, ensure_dir
 
 
 def train_cat(cfg: Dict, out_root: str) -> None:
-    """
-    Train a CatBoost multi-class classifier using the dataset/config provided.
-    Artifacts saved to: {out_root}/{cfg['dataset']}/
-      - catboost.pkl
-      - features.pkl
-      - catboost_val_report.json
-      - catboost_test_report.json
-    """
-    # load & prepare data
     df = load_dataset(cfg)
     X, y, features = select_features(df, cfg["target_col"])
     Xtr, ytr, Xva, yva, Xte, yte = split_sets(X, y, cfg["split"])
 
-    # model params from YAML (with defaults if missing)
+    # encode string labels -> ints
+    le = LabelEncoder().fit(y)
+    ytr_enc = le.transform(ytr)
+    yva_enc = le.transform(yva)
+    yte_enc = le.transform(yte)
+
     mcfg = cfg.get("models", {}).get("cat", {})
     params = {
         "iterations": mcfg.get("iterations", 800),
@@ -31,14 +28,19 @@ def train_cat(cfg: Dict, out_root: str) -> None:
         "verbose": False,
     }
 
-    # if you have categorical columns, pass their indices via cat_features=...
     clf = CatBoostClassifier(**params)
-    clf.fit(Xtr, ytr, eval_set=(Xva, yva), use_best_model=False)
+    # if you have categorical feature indices, add cat_features=[...]
+    clf.fit(Xtr, ytr_enc, eval_set=(Xva, yva_enc), use_best_model=False)
 
-    # reports + artifacts
+    # reports (inverse-transform)
+    import numpy as np
+
+    val_pred = le.inverse_transform(clf.predict(Xva).astype(int).ravel())
+    test_pred = le.inverse_transform(clf.predict(Xte).astype(int).ravel())
+
     out_dir = f"{out_root}/{cfg['dataset']}"
     ensure_dir(out_dir)
-    dump_report(yva, clf.predict(Xva), f"{out_dir}/catboost_val_report.json")
-    dump_report(yte, clf.predict(Xte), f"{out_dir}/catboost_test_report.json")
+    dump_report(yva, val_pred, f"{out_dir}/catboost_val_report.json")
+    dump_report(yte, test_pred, f"{out_dir}/catboost_test_report.json")
 
-    save_artifacts(out_dir, catboost=clf, features=features)
+    save_artifacts(out_dir, catboost=clf, features=features, classes=list(le.classes_))
