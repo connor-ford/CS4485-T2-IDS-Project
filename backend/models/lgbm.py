@@ -1,15 +1,21 @@
 from typing import Any, Dict, List
-import joblib, numpy as np, pandas as pd
+import os, joblib, numpy as np, pandas as pd
 from .base import BaseModelRunner
 
 MODEL_NAME = "lgbm"
 
 
+def _art_dir() -> str:
+    default = os.path.join(os.path.dirname(os.path.dirname(__file__)), "artifacts")
+    return os.getenv("IDSML_ARTIFACTS_DIR", default)
+
+
 class _LGBMRunner(BaseModelRunner):
     def __init__(self):
-        self.model = joblib.load("/app/artifacts/lgbm.pkl")
-        self.features: List[str] = joblib.load("/app/artifacts/features.pkl")
-        self.classes: List[str] = joblib.load("/app/artifacts/classes.pkl")
+        art = _art_dir()
+        self.model = joblib.load(os.path.join(art, "lgbm.pkl"))
+        self.features: List[str] = joblib.load(os.path.join(art, "features.pkl"))
+        self.classes: List[str] = joblib.load(os.path.join(art, "classes.pkl"))
 
     def validate(self, inputs: Dict[str, Any]) -> None:
         missing = [f for f in self.features if f not in inputs]
