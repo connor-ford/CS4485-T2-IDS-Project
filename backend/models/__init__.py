@@ -5,6 +5,7 @@ from .base import BaseModelRunner
 
 MODEL_REGISTRY: Dict[str, BaseModelRunner] = {}
 
+
 def _auto_register():
     # import every submodule under models.* (except private/base/dunder)
     package = __name__
@@ -18,5 +19,6 @@ def _auto_register():
             runner = getattr(module, "RUNNER")
             if isinstance(runner, BaseModelRunner):
                 MODEL_REGISTRY[getattr(module, "MODEL_NAME")] = runner
+
 
 _auto_register()

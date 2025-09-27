@@ -23,15 +23,15 @@ def train_lgbm(cfg: Dict, out_root: str) -> None:
     # model params from YAML (with defaults if missing)
     mcfg = cfg.get("models", {}).get("lgbm", {})
     params = {
-        "n_estimators":     mcfg.get("n_estimators", 800),
-        "learning_rate":    mcfg.get("learning_rate", 0.05),
-        "subsample":        mcfg.get("subsample", 0.8),
+        "n_estimators": mcfg.get("n_estimators", 800),
+        "learning_rate": mcfg.get("learning_rate", 0.05),
+        "subsample": mcfg.get("subsample", 0.8),
         "colsample_bytree": mcfg.get("colsample_bytree", 0.8),
-        "reg_lambda":       mcfg.get("reg_lambda", 1.0),
-        "max_depth":        mcfg.get("max_depth", -1),
-        "objective":        "multiclass",
-        "random_state":     cfg["split"]["random_state"],
-        "verbosity":        -1,
+        "reg_lambda": mcfg.get("reg_lambda", 1.0),
+        "max_depth": mcfg.get("max_depth", -1),
+        "objective": "multiclass",
+        "random_state": cfg["split"]["random_state"],
+        "verbosity": -1,
     }
 
     clf = LGBMClassifier(**params)

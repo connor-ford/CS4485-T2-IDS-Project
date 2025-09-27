@@ -10,6 +10,7 @@ MODEL_NAME = "xgb"
 
 FEATURES: List[str] = []  # set exactly to the notebook’s feature columns
 
+
 class _XGBRunner(BaseModelRunner):
     def __init__(self):
         self.model = joblib.load("/app/artifacts/xgb.pkl")
@@ -27,5 +28,6 @@ class _XGBRunner(BaseModelRunner):
         proba = self.model.predict_proba(x)[0]
         pred = self.model.classes_[int(np.argmax(proba))]
         return {"label": str(pred), "proba": proba.tolist()}
+
 
 RUNNER = _XGBRunner()

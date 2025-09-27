@@ -2,6 +2,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Tuple
 
+
 class BaseModelRunner(ABC):
     """minimal runner interface."""
 

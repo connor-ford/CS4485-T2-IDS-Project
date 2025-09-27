@@ -23,16 +23,16 @@ def train_xgb(cfg: Dict, out_root: str) -> None:
     # model params from YAML (with defaults if missing)
     mcfg = cfg.get("models", {}).get("xgb", {})
     params = {
-        "n_estimators":     mcfg.get("n_estimators", 500),
-        "max_depth":        mcfg.get("max_depth", 8),
-        "learning_rate":    mcfg.get("learning_rate", 0.1),
-        "subsample":        mcfg.get("subsample", 0.8),
+        "n_estimators": mcfg.get("n_estimators", 500),
+        "max_depth": mcfg.get("max_depth", 8),
+        "learning_rate": mcfg.get("learning_rate", 0.1),
+        "subsample": mcfg.get("subsample", 0.8),
         "colsample_bytree": mcfg.get("colsample_bytree", 0.8),
-        "tree_method":      mcfg.get("tree_method", "hist"),
-        "eval_metric":      mcfg.get("eval_metric", "mlogloss"),
-        "objective":        "multi:softprob",
-        "random_state":     cfg["split"]["random_state"],
-        "n_jobs":           mcfg.get("n_jobs", -1),
+        "tree_method": mcfg.get("tree_method", "hist"),
+        "eval_metric": mcfg.get("eval_metric", "mlogloss"),
+        "objective": "multi:softprob",
+        "random_state": cfg["split"]["random_state"],
+        "n_jobs": mcfg.get("n_jobs", -1),
     }
 
     clf = XGBClassifier(**params)

@@ -23,12 +23,12 @@ def train_cat(cfg: Dict, out_root: str) -> None:
     # model params from YAML (with defaults if missing)
     mcfg = cfg.get("models", {}).get("cat", {})
     params = {
-        "iterations":     mcfg.get("iterations", 800),
-        "depth":          mcfg.get("depth", 8),
-        "learning_rate":  mcfg.get("learning_rate", 0.1),
-        "loss_function":  mcfg.get("loss_function", "MultiClass"),
-        "random_state":   cfg["split"]["random_state"],
-        "verbose":        False,
+        "iterations": mcfg.get("iterations", 800),
+        "depth": mcfg.get("depth", 8),
+        "learning_rate": mcfg.get("learning_rate", 0.1),
+        "loss_function": mcfg.get("loss_function", "MultiClass"),
+        "random_state": cfg["split"]["random_state"],
+        "verbose": False,
     }
 
     # if you have categorical columns, pass their indices via cat_features=...

@@ -6,18 +6,22 @@ from .base import BaseModelRunner
 
 MODEL_NAME = "lccde"
 
+
 class _LCCDERunner(BaseModelRunner):
     """
     LCCDE:
       - leader per class is chosen from {xgb, lgbm, catboost} using validation metrics.
       - at inference, use model probabilities, respecting leader assignment per class.
     """
+
     def __init__(self):
         # load base models + preprocessors
         self.xgb = joblib.load("/app/artifacts/xgb.pkl")
         self.lgbm = joblib.load("/app/artifacts/lgbm.pkl")
         self.cat = joblib.load("/app/artifacts/catboost.pkl")
-        self.prep = joblib.load("/app/artifacts/lccde_prep.pkl")   # share a single prep if they match
+        self.prep = joblib.load(
+            "/app/artifacts/lccde_prep.pkl"
+        )  # share a single prep if they match
         self.features: List[str] = joblib.load("/app/artifacts/features.pkl")
 
         # mapping: class_label -> {"leader": "xgb"|"lgbm"|"cat", "classes": [ordered labels]}
@@ -47,9 +51,12 @@ class _LCCDERunner(BaseModelRunner):
 
         # raw best across all (model,class)
         all_scores = []
-        for c, s in px.items(): all_scores.append(("xgb", c, s))
-        for c, s in pl.items(): all_scores.append(("lgbm", c, s))
-        for c, s in pc.items(): all_scores.append(("cat", c, s))
+        for c, s in px.items():
+            all_scores.append(("xgb", c, s))
+        for c, s in pl.items():
+            all_scores.append(("lgbm", c, s))
+        for c, s in pc.items():
+            all_scores.append(("cat", c, s))
         model_w, class_w, score_w = max(all_scores, key=lambda t: t[2])
 
         # enforce leader-by-class
@@ -62,9 +69,16 @@ class _LCCDERunner(BaseModelRunner):
             final_score = pc[class_w]
 
         # optional thresholding / tie-breaks could go here
-        return {"label": class_w, "leader": leader, "score": final_score,
-                "proba": {"xgb": px.get(class_w, 0.0),
-                          "lgbm": pl.get(class_w, 0.0),
-                          "cat": pc.get(class_w, 0.0)}}
+        return {
+            "label": class_w,
+            "leader": leader,
+            "score": final_score,
+            "proba": {
+                "xgb": px.get(class_w, 0.0),
+                "lgbm": pl.get(class_w, 0.0),
+                "cat": pc.get(class_w, 0.0),
+            },
+        }
+
 
 RUNNER = _LCCDERunner()

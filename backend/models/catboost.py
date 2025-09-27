@@ -9,6 +9,7 @@ from .common import TabularPreprocessor
 MODEL_NAME = "catboost"
 FEATURES: List[str] = []
 
+
 class _CatRunner(BaseModelRunner):
     def __init__(self):
         self.model = joblib.load("/app/artifacts/catboost.pkl")
@@ -26,5 +27,6 @@ class _CatRunner(BaseModelRunner):
         proba = self.model.predict_proba(x)[0]
         pred = self.model.classes_[int(np.argmax(proba))]
         return {"label": str(pred), "proba": proba.tolist()}
+
 
 RUNNER = _CatRunner()
