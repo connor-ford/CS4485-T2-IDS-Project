@@ -26,6 +26,7 @@ def train_cat(cfg: Dict, out_root: str) -> None:
         "loss_function": mcfg.get("loss_function", "MultiClass"),
         "random_state": cfg["split"]["random_state"],
         "verbose": False,
+        "allow_writing_files": False,
     }
 
     clf = CatBoostClassifier(**params)
