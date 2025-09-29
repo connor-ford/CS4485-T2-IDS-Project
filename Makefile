@@ -7,9 +7,10 @@ CONFIG=$(BACKEND)/training/config/cicids.yaml
 
 # venv
 init:
-	python3 -m venv .venv
-	$(PY) -m pip install -U pip setuptools wheel
-	$(PIP) install --only-binary=:all: -r $(BACKEND)/requirements.txt
+	cd $(BACKEND); \
+		python3 -m venv .venv; \
+		$(PY) -m pip install -U pip setuptools wheel; \
+		$(PIP) install --only-binary=:all: -r requirements.txt
 
 # training
 train-all:
@@ -43,7 +44,7 @@ docker-run:
 
 # utility
 clean:
-	rm -rf .venv $(ARTIFACTS) __pycache__ $(BACKEND)/**/__pycache__
+	rm -rf $(BACKEND)/.venv $(ARTIFACTS) __pycache__ $(BACKEND)/**/__pycache__
 
 # schema
 
