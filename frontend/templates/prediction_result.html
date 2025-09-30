@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Prediction Result - IDS Model Interface{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 style="color: #1B4D3E;">
+                <i class="fas fa-chart-line me-2"></i>
+                Prediction Result
+            </h2>
+            <div>
+                <a href="{{ url_for('model_config', model_name=model_name) }}" class="btn btn-outline-primary me-2" style="border-color: #1B4D3E; color: #1B4D3E;">
+                    <i class="fas fa-redo me-2"></i>New Prediction
+                </a>
+                <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-home me-2"></i>Home
+                </a>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Prediction Result -->
+            <div class="col-lg-8 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-brain me-2"></i>
+                            {{ model_name|upper }} Model Prediction
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="text-muted">Predicted Label</h6>
+                                <h3 style="color: #1B4D3E;">
+                                    <span class="badge fs-6" style="background-color: #1B4D3E;">{{ prediction.label }}</span>
+                                </h3>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-muted">Confidence</h6>
+                                <h3 style="color: #1B4D3E;">
+                                    {{ "%.2f"|format(prediction.proba|max * 100) }}%
+                                </h3>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Probability Distribution -->
+                        <h6 class="mb-3">Probability Distribution</h6>
+                        <div class="probability-bars">
+                            {% for prob in prediction.proba %}
+                            <div class="mb-2">
+                                <div class="d-flex justify-content-between">
+                                    <span class="small">{{ classes[loop.index0] }}</span>
+                                    <span class="small text-muted">{{ "%.3f"|format(prob) }}</span>
+                                </div>
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar" 
+                                        role="progressbar" 
+                                        style="width: {{ prob * 100 }}%; background-color: {% if prob == prediction.proba|max %}#1B4D3E{% else %}#6c757d{% endif %};"
+                                        aria-valuenow="{{ prob * 100 }}" 
+                                        aria-valuemin="0" 
+                                        aria-valuemax="100">
+                                        {{ "%.1f"|format(prob * 100) }}%
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Model Metadata -->
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Model Information
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <h6 class="text-muted">Model</h6>
+                        <p class="mb-3">{{ model_name|upper }}</p>
+
+                        <h6 class="text-muted">Inference Time</h6>
+                        <p class="mb-3">
+                            {% if meta.inference_ms %}
+                                {{ meta.inference_ms }} ms
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </p>
+
+                        <h6 class="text-muted">Timestamp</h6>
+                        <p class="mb-3 small text-muted" id="timestamp"></p>
+
+                        <hr>
+
+                        <div class="d-grid">
+                            <button class="btn btn-outline-primary btn-sm" onclick="copyResult()">
+                                <i class="fas fa-copy me-2"></i>Copy Result
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Raw JSON Result -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-code me-2"></i>Raw Result Data
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <pre class="bg-light p-3 rounded"><code id="rawResult">{{ prediction|tojson(indent=2) }}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Set timestamp when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    const timestampElement = document.getElementById('timestamp');
+    if (timestampElement) {
+        const now = new Date();
+        timestampElement.textContent = now.toLocaleString();
+    }
+});
+
+function copyResult() {
+    const result = {
+        model: "{{ model_name }}",
+        prediction: {{ prediction|tojson }},
+        meta: {{ meta|tojson }}
+    };
+    
+    navigator.clipboard.writeText(JSON.stringify(result, null, 2)).then(() => {
+        // Show a temporary success message
+        const btn = event.target;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check me-2"></i>Copied!';
+        btn.classList.remove('btn-outline-primary');
+        btn.classList.add('btn-success');
+        
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-primary');
+        }, 2000);
+    });
+}
+</script>
+{% endblock %}
+
