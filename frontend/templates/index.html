@@ -22,15 +22,15 @@
                     <div class="card-body text-center">
                         <div class="model-icon mb-3">
                             {% if model == 'xgb' %}
-                                <i class="fas fa-tree" style="color: #1B4D3E;"></i>
+                                <i class="fas fa-tree" style="color: white;"></i>
                             {% elif model == 'lgbm' %}
-                                <i class="fas fa-bolt" style="color: #E65100;"></i>
+                                <i class="fas fa-bolt" style="color: white;"></i>
                             {% elif model == 'catboost' %}
-                                <i class="fas fa-cat" style="color: #E65100;"></i>
+                                <i class="fas fa-cat" style="color: white;"></i>
                             {% elif model == 'lccde' %}
-                                <i class="fas fa-layer-group" style="color: #1B4D3E;"></i>
+                                <i class="fas fa-layer-group" style="color: white;"></i>
                             {% else %}
-                                <i class="fas fa-robot text-secondary"></i>
+                                <i class="fas fa-robot" style="color: white;"></i>
                             {% endif %}
                         </div>
                         <h5 class="card-title text-uppercase">{{ model }}</h5>

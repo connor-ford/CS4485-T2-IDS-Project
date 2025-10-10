@@ -29,6 +29,8 @@ body {
     transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
     border: none;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    background-color: #E65100;
+    color: white;
 }
 
 .model-card:hover {

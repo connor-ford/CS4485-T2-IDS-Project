@@ -25,8 +25,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }, false);
     });
 
-    // Auto-dismiss alerts after 5 seconds
-    const alerts = document.querySelectorAll('.alert:not(.alert-permanent)');
+    // Auto-dismiss only alerts explicitly marked
+    const alerts = document.querySelectorAll('.alert[data-auto-dismiss="true"]');
     alerts.forEach(alert => {
         setTimeout(() => {
             const bsAlert = new bootstrap.Alert(alert);
@@ -246,5 +246,93 @@ function fillSampleData() {
     }
     
     showToast('Sample data filled!', 'success');
+}
+
+// Load CSV and populate form (client-side)
+async function loadCsvToForm(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) {
+        showToast('No CSV selected', 'warning');
+        return;
+    }
+
+    try {
+        const text = await file.text();
+        // Simple CSV parser for first row
+        const lines = text.split(/\r?\n/).filter(Boolean);
+        if (lines.length === 0) {
+            showToast('CSV is empty', 'danger');
+            return;
+        }
+
+        const header = lines[0].split(',').map(h => h.trim());
+        const row = (lines[1] || '').split(',');
+        if (row.length === 0 || row.every(v => v === '')) {
+            showToast('CSV has no data row', 'danger');
+            return;
+        }
+
+        // Validate headers against expected features
+        const expected = (document.getElementById('features-data')?.value || '').split(',').map(s => s.trim()).filter(Boolean);
+        const headerSet = new Set(header);
+        const expectedSet = new Set(expected);
+
+        const missing = expected.filter(f => !headerSet.has(f));
+        const extra = header.filter(h => !expectedSet.has(h));
+
+        const msgEl = document.getElementById('csvMismatchMsg');
+        if (msgEl) {
+            msgEl.classList.remove('d-none', 'alert-success', 'alert-warning');
+            msgEl.classList.add('alert', 'alert-permanent');
+            if (missing.length === 0 && extra.length === 0) {
+                msgEl.classList.remove('alert-warning');
+                msgEl.classList.add('alert-success');
+                msgEl.textContent = 'Headers match schema.';
+            } else {
+                msgEl.classList.remove('alert-success');
+                msgEl.classList.add('alert-warning');
+                const parts = [];
+                if (missing.length) parts.push(`Missing (${missing.length}): ${missing.slice(0,10).join(', ')}${missing.length>10?'...':''}`);
+                if (extra.length) parts.push(`Extra (${extra.length}): ${extra.slice(0,10).join(', ')}${extra.length>10?'...':''}`);
+                msgEl.textContent = parts.join(' | ');
+            }
+        }
+
+        // Map header->value and fill matching feature inputs only
+        const valueByCol = {};
+        header.forEach((h, i) => {
+            valueByCol[h] = row[i];
+        });
+
+        let filled = 0;
+        expected.forEach(col => {
+            const input = document.getElementById('feature_' + col);
+            if (input) {
+                const val = valueByCol[col];
+                if (val !== undefined && val !== '') {
+                    const num = Number(val);
+                    input.value = Number.isFinite(num) ? num : '';
+                    filled += 1;
+                }
+            }
+        });
+
+        if (filled === 0) {
+            showToast('CSV headers do not match expected features', 'warning');
+        } else {
+            showToast(`Loaded CSV: populated ${filled} fields`, 'success');
+        }
+    } catch (err) {
+        showToast('Failed to read CSV', 'danger');
+    }
+}
+
+// Clear all feature inputs
+function clearFeatureForm() {
+    const inputs = document.querySelectorAll('[id^="feature_"]');
+    inputs.forEach(inp => {
+        inp.value = '';
+    });
+    showToast('Cleared inputs', 'info');
 }
 

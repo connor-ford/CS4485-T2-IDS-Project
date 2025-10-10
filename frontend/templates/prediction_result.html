@@ -104,6 +104,9 @@
                             <button class="btn btn-outline-primary btn-sm" onclick="copyResult()">
                                 <i class="fas fa-copy me-2"></i>Copy Result
                             </button>
+                            <button class="btn btn-outline-secondary btn-sm mt-2" onclick="downloadResultCsv()">
+                                <i class="fas fa-file-download me-2"></i>Download CSV
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -161,6 +164,39 @@ function copyResult() {
             btn.classList.add('btn-outline-primary');
         }, 2000);
     });
+}
+
+function downloadResultCsv() {
+    const model = "{{ model_name }}";
+    const probs = {{ prediction.proba|tojson }};
+    const classes = {{ classes|tojson }};
+    const label = {{ prediction.label|tojson }};
+    const rows = [];
+    rows.push(['model','predicted_label']);
+    rows.push([model, label]);
+    rows.push([]);
+    rows.push(['class','probability']);
+    for (let i = 0; i < classes.length; i++) {
+        rows.push([classes[i], String(probs[i])]);
+    }
+
+    const csv = rows.map(r => r.map(v => {
+        const s = String(v ?? '');
+        if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+            return '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+    }).join(',')).join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${model}_prediction.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 </script>
 {% endblock %}
