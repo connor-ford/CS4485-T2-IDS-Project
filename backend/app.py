@@ -2,6 +2,7 @@ import os
 import joblib
 from flask import Flask, request, jsonify
 from models import MODEL_REGISTRY
+from utils.database_json import save_result_to_json
 
 app = Flask(__name__)
 
@@ -41,9 +42,25 @@ def predict():
 
     try:
         pred, meta = runner.predict(inputs)
+
+        save_result_to_json({
+            "model": model_name,
+            "inputs": inputs,
+            "prediction": pred,
+            "meta": meta or {},
+            "source": "frontend_form"
+        })
+
+
         return jsonify({"model": model_name, "prediction": pred, "meta": meta or {}})
     except Exception as e:
         return jsonify({"error": f"inference failed: {type(e).__name__}: {e}"}), 400
+
+@app.route("/history", methods=["GET"])
+def history():
+    with open(os.path.join("data", "results.json"), "r") as f:
+        data = json.load(f)
+    return jsonify(data)
 
 
 @app.get("/schema")
