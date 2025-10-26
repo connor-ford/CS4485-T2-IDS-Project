@@ -1,21 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}Prediction Result - IDS Model Interface{% endblock %}
+{% block title %}Prediction Result{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-lg-8 mx-auto">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 style="color: #1B4D3E;">
-                <i class="fas fa-chart-line me-2"></i>
-                Prediction Result
-            </h2>
+            <h2>Prediction Result</h2>
             <div>
-                <a href="{{ url_for('model_config', model_name=model_name) }}" class="btn btn-outline-primary me-2" style="border-color: #1B4D3E; color: #1B4D3E;">
-                    <i class="fas fa-redo me-2"></i>New Prediction
-                </a>
-                <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
-                    <i class="fas fa-home me-2"></i>Home
+                <a href="{{ url_for('model_config', model_name=model_name) }}" class="btn btn-primary">
+                    New Prediction
                 </a>
             </div>
         </div>
@@ -25,50 +19,28 @@
             <div class="col-lg-8 mb-4">
                 <div class="card">
                     <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fas fa-brain me-2"></i>
-                            {{ model_name|upper }} Model Prediction
-                        </h5>
+                        <h5>{{ model_name|upper }} Model Prediction</h5>
                     </div>
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-6">
-                                <h6 class="text-muted">Predicted Label</h6>
-                                <h3 style="color: #1B4D3E;">
-                                    <span class="badge fs-6" style="background-color: #1B4D3E;">{{ prediction.label }}</span>
+                                <h6>Predicted Label</h6>
+                                <h3>
+                                    <span class="badge bg-primary fs-6">{{ prediction.label }}</span>
                                 </h3>
                             </div>
                             <div class="col-md-6">
-                                <h6 class="text-muted">Confidence</h6>
-                                <h3 style="color: #1B4D3E;">
-                                    {{ "%.2f"|format(prediction.proba|max * 100) }}%
-                                </h3>
+                                <h6>Confidence</h6>
+                                <h3>{{ "%.2f"|format(prediction.proba|max * 100) }}%</h3>
                             </div>
                         </div>
 
                         <hr>
 
-                        <!-- Probability Distribution -->
-                        <h6 class="mb-3">Probability Distribution</h6>
-                        <div class="probability-bars">
-                            {% for prob in prediction.proba %}
-                            <div class="mb-2">
-                                <div class="d-flex justify-content-between">
-                                    <span class="small">{{ classes[loop.index0] }}</span>
-                                    <span class="small text-muted">{{ "%.3f"|format(prob) }}</span>
-                                </div>
-                                <div class="progress" style="height: 20px;">
-                                    <div class="progress-bar" 
-                                        role="progressbar" 
-                                        style="width: {{ prob * 100 }}%; background-color: {% if prob == prediction.proba|max %}#1B4D3E{% else %}#6c757d{% endif %};"
-                                        aria-valuenow="{{ prob * 100 }}" 
-                                        aria-valuemin="0" 
-                                        aria-valuemax="100">
-                                        {{ "%.1f"|format(prob * 100) }}%
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
+                        <!-- Probability Distribution Chart -->
+                        <h6>Probability Distribution</h6>
+                        <div class="mb-3">
+                            <canvas id="probabilityChart" width="400" height="200"></canvas>
                         </div>
                     </div>
                 </div>
@@ -78,32 +50,110 @@
             <div class="col-lg-4">
                 <div class="card">
                     <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fas fa-info-circle me-2"></i>Model Information
-                        </h5>
+                        <h5>Model Information</h5>
                     </div>
                     <div class="card-body">
-                        <h6 class="text-muted">Model</h6>
+                        <h6>Model</h6>
                         <p class="mb-3">{{ model_name|upper }}</p>
 
-                        <h6 class="text-muted">Inference Time</h6>
-                        <p class="mb-3">
-                            {% if meta.inference_ms %}
-                                {{ meta.inference_ms }} ms
-                            {% else %}
-                                N/A
-                            {% endif %}
-                        </p>
-
-                        <h6 class="text-muted">Timestamp</h6>
+                        <h6>Timestamp</h6>
                         <p class="mb-3 small text-muted" id="timestamp"></p>
 
                         <hr>
 
-                        <div class="d-grid">
-                            <button class="btn btn-outline-primary btn-sm" onclick="copyResult()">
-                                <i class="fas fa-copy me-2"></i>Copy Result
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-primary btn-sm" onclick="downloadRawData()">
+                                Download Raw Data
                             </button>
+                            <button class="btn btn-outline-info btn-sm" onclick="showComparison()">
+                                Compare Results
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Results Table -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Current Results</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Class</th>
+                                        <th>Probability</th>
+                                        <th>Percentage</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for prob in prediction.proba %}
+                                    <tr>
+                                        <td>{{ classes[loop.index0] }}</td>
+                                        <td>{{ "%.6f"|format(prob) }}</td>
+                                        <td>{{ "%.2f"|format(prob * 100) }}%</td>
+                                        <td>
+                                            {% if prob == prediction.proba|max %}
+                                                <span class="badge bg-success">Predicted</span>
+                                            {% elif prob > 0.1 %}
+                                                <span class="badge bg-warning">High</span>
+                                            {% elif prob > 0.01 %}
+                                                <span class="badge bg-info">Medium</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Low</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Comparison Section -->
+        <div class="row mt-4" id="comparisonSection" style="display: none;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Results Comparison</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Select Previous Results to Compare:</label>
+                                <select class="form-select" id="comparisonSelect" onchange="updateComparison()">
+                                    <option value="">Choose a previous result...</option>
+                                    <option value="mock1">XGBoost - Benign (2024-01-15 10:30)</option>
+                                    <option value="mock2">LightGBM - DDoS (2024-01-15 09:45)</option>
+                                    <option value="mock3">CatBoost - PortScan (2024-01-15 08:20)</option>
+                                    <option value="mock4">LCCDE - Bot (2024-01-14 16:15)</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div id="comparisonTable" style="display: none;">
+                            <div class="table-responsive">
+                                <table class="table table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Class</th>
+                                            <th>Current Result</th>
+                                            <th>Previous Result</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="comparisonTableBody">
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -115,12 +165,10 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fas fa-code me-2"></i>Raw Result Data
-                        </h5>
+                        <h5>Raw Result Data</h5>
                     </div>
                     <div class="card-body">
-                        <pre class="bg-light p-3 rounded"><code id="rawResult">{{ prediction|tojson(indent=2) }}</code></pre>
+                        <pre class="bg-light p-3 rounded"><code id="rawDataDisplay">{{ prediction|tojson(indent=2) }}</code></pre>
                     </div>
                 </div>
             </div>
@@ -131,35 +179,194 @@
 
 {% block scripts %}
 <script>
+// Mock previous results data
+const mockResults = {
+    mock1: {
+        model: 'XGBoost',
+        prediction: { label: 'BENIGN', proba: [0.85, 0.05, 0.03, 0.02, 0.05] },
+        timestamp: '2024-01-15 10:30'
+    },
+    mock2: {
+        model: 'LightGBM',
+        prediction: { label: 'DDoS', proba: [0.02, 0.78, 0.15, 0.03, 0.02] },
+        timestamp: '2024-01-15 09:45'
+    },
+    mock3: {
+        model: 'CatBoost',
+        prediction: { label: 'PortScan', proba: [0.01, 0.05, 0.82, 0.10, 0.02] },
+        timestamp: '2024-01-15 08:20'
+    },
+    mock4: {
+        model: 'LCCDE',
+        prediction: { label: 'Bot', proba: [0.03, 0.02, 0.08, 0.05, 0.82] },
+        timestamp: '2024-01-14 16:15'
+    }
+};
+
 // Set timestamp when page loads
 document.addEventListener('DOMContentLoaded', function() {
     const timestampElement = document.getElementById('timestamp');
+    const rawDataDisplay = document.getElementById('rawDataDisplay');
+    
     if (timestampElement) {
         const now = new Date();
         timestampElement.textContent = now.toLocaleString();
     }
+    
+    // Update raw data display with model name and date
+    if (rawDataDisplay) {
+        const enhancedData = {
+            model: "{{ model_name }}",
+            date: new Date().toISOString().split('T')[0],
+            timestamp: new Date().toISOString(),
+            prediction: {{ prediction|tojson }},
+            classes: {{ classes|tojson }}
+        };
+        rawDataDisplay.textContent = JSON.stringify(enhancedData, null, 2);
+    }
+    
+    // Create probability distribution chart
+    createProbabilityChart();
 });
 
-function copyResult() {
+// Download raw data as JSON file
+function downloadRawData() {
     const result = {
         model: "{{ model_name }}",
+        date: new Date().toISOString().split('T')[0],
+        timestamp: new Date().toISOString(),
         prediction: {{ prediction|tojson }},
-        meta: {{ meta|tojson }}
+        classes: {{ classes|tojson }}
     };
     
-    navigator.clipboard.writeText(JSON.stringify(result, null, 2)).then(() => {
-        // Show a temporary success message
-        const btn = event.target;
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-check me-2"></i>Copied!';
-        btn.classList.remove('btn-outline-primary');
-        btn.classList.add('btn-success');
+    const dataStr = JSON.stringify(result, null, 2);
+    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+    
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `{{ model_name }}_prediction_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Raw data downloaded successfully
+}
+
+// Show comparison section
+function showComparison() {
+    const comparisonSection = document.getElementById('comparisonSection');
+    if (comparisonSection.style.display === 'none') {
+        comparisonSection.style.display = 'block';
+        comparisonSection.scrollIntoView({ behavior: 'smooth' });
+    } else {
+        comparisonSection.style.display = 'none';
+    }
+}
+
+// Update comparison table
+function updateComparison() {
+    const select = document.getElementById('comparisonSelect');
+    const comparisonTable = document.getElementById('comparisonTable');
+    const tableBody = document.getElementById('comparisonTableBody');
+    
+    if (select.value === '') {
+        comparisonTable.style.display = 'none';
+        return;
+    }
+    
+    const selectedResult = mockResults[select.value];
+    const currentResult = {
+        prediction: {{ prediction|tojson }},
+        classes: {{ classes|tojson }}
+    };
+    
+    // Clear previous content
+    tableBody.innerHTML = '';
+    
+    // Add comparison rows
+    currentResult.classes.forEach((className, index) => {
+        const currentProb = currentResult.prediction.proba[index];
+        const previousProb = selectedResult.prediction.proba[index];
         
-        setTimeout(() => {
-            btn.innerHTML = originalText;
-            btn.classList.remove('btn-success');
-            btn.classList.add('btn-outline-primary');
-        }, 2000);
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>${className}</strong></td>
+            <td>${(currentProb * 100).toFixed(2)}%</td>
+            <td>${(previousProb * 100).toFixed(2)}%</td>
+        `;
+        tableBody.appendChild(row);
+    });
+    
+    // Add summary row
+    const summaryRow = document.createElement('tr');
+    summaryRow.className = 'table-info';
+    summaryRow.innerHTML = `
+        <td><strong>Summary</strong></td>
+        <td><strong>Current: {{ prediction.label }}</strong></td>
+        <td><strong>Previous: ${selectedResult.prediction.label}</strong></td>
+    `;
+    tableBody.appendChild(summaryRow);
+    
+    comparisonTable.style.display = 'block';
+}
+
+// Create probability distribution chart
+function createProbabilityChart() {
+    const ctx = document.getElementById('probabilityChart');
+    if (!ctx) return;
+    
+    const classes = {{ classes|tojson }};
+    const probabilities = {{ prediction.proba|tojson }};
+    const predictedLabel = "{{ prediction.label }}";
+    
+    // Color scheme - highlight the predicted class
+    const colors = classes.map((className, index) => {
+        return className === predictedLabel ? '#28a745' : '#007bff';
+    });
+    
+    const chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: classes,
+            datasets: [{
+                label: 'Probability',
+                data: probabilities.map(p => (p * 100).toFixed(1)),
+                backgroundColor: colors,
+                borderColor: colors,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Prediction Probabilities by Class'
+                },
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    }
+                },
+                x: {
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 0
+                    }
+                }
+            },
+            animation: false
+        }
     });
 }
 </script>
