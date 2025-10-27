@@ -129,13 +129,12 @@
                     <div class="card-body">
                         <div class="row mb-3">
                             <div class="col-md-6">
-                                <label class="form-label">Select Previous Results to Compare:</label>
-                                <select class="form-select" id="comparisonSelect" onchange="updateComparison()">
-                                    <option value="">Choose a previous result...</option>
-                                    <option value="mock1">XGBoost - Benign (2024-01-15 10:30)</option>
-                                    <option value="mock2">LightGBM - DDoS (2024-01-15 09:45)</option>
-                                    <option value="mock3">CatBoost - PortScan (2024-01-15 08:20)</option>
-                                    <option value="mock4">LCCDE - Bot (2024-01-14 16:15)</option>
+                                <label class="form-label">Select Previous Execution to Compare:</label>
+                                <select class="form-select" id="comparisonSelect">
+                                    <option value="">Choose a previous execution</option>
+                                        {% for prevExecution in comparisons %}
+                                        <option value="">{{ prevExecution.model_name }} - {{ prevExecution.timestamp }}</option>
+                                        {% endfor %}
                                 </select>
                             </div>
                         </div>
@@ -168,7 +167,7 @@
                         <h5>Raw Result Data</h5>
                     </div>
                     <div class="card-body">
-                        <pre class="bg-light p-3 rounded"><code id="rawDataDisplay">{{ prediction|tojson(indent=2) }}</code></pre>
+                        <pre class="bg-light p-3 rounded"><code id="rawDataDisplay"></code></pre>
                     </div>
                 </div>
             </div>
@@ -179,6 +178,13 @@
 
 {% block scripts %}
 <script>
+
+// get result from render_template
+var comparisons = JSON.parse('{{ comparisons | tojson}}')
+var prediction = JSON.parse('{{ prediction | tojson}}');
+var classes = JSON.parse('{{ classes | tojson}}');
+var modelName = "{{ model_name }}";
+console.log(comparisons)
 // Mock previous results data
 const mockResults = {
     mock1: {
@@ -215,14 +221,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Update raw data display with model name and date
     if (rawDataDisplay) {
-        const enhancedData = {
-            model: "{{ model_name }}",
+        const rawData = {
+            model: modelName,
             date: new Date().toISOString().split('T')[0],
             timestamp: new Date().toISOString(),
-            prediction: {{ prediction|tojson }},
-            classes: {{ classes|tojson }}
+            prediction: prediction,
+            classes: classes
         };
-        rawDataDisplay.textContent = JSON.stringify(enhancedData, null, 2);
+        rawDataDisplay.textContent = JSON.stringify(rawData, null, 2);
     }
     
     // Create probability distribution chart
@@ -232,11 +238,11 @@ document.addEventListener('DOMContentLoaded', function() {
 // Download raw data as JSON file
 function downloadRawData() {
     const result = {
-        model: "{{ model_name }}",
+        model: modelName,
         date: new Date().toISOString().split('T')[0],
         timestamp: new Date().toISOString(),
-        prediction: {{ prediction|tojson }},
-        classes: {{ classes|tojson }}
+        prediction: prediction,
+        classes: classes
     };
     
     const dataStr = JSON.stringify(result, null, 2);
@@ -244,12 +250,10 @@ function downloadRawData() {
     
     const link = document.createElement('a');
     link.href = URL.createObjectURL(dataBlob);
-    link.download = `{{ model_name }}_prediction_${new Date().toISOString().split('T')[0]}.json`;
+    link.download = modelName + '_prediction_' + new Date().toISOString().split('T')[0] + '.json';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
-    // Raw data downloaded successfully
 }
 
 // Show comparison section
@@ -257,57 +261,9 @@ function showComparison() {
     const comparisonSection = document.getElementById('comparisonSection');
     if (comparisonSection.style.display === 'none') {
         comparisonSection.style.display = 'block';
-        comparisonSection.scrollIntoView({ behavior: 'smooth' });
     } else {
         comparisonSection.style.display = 'none';
     }
-}
-
-// Update comparison table
-function updateComparison() {
-    const select = document.getElementById('comparisonSelect');
-    const comparisonTable = document.getElementById('comparisonTable');
-    const tableBody = document.getElementById('comparisonTableBody');
-    
-    if (select.value === '') {
-        comparisonTable.style.display = 'none';
-        return;
-    }
-    
-    const selectedResult = mockResults[select.value];
-    const currentResult = {
-        prediction: {{ prediction|tojson }},
-        classes: {{ classes|tojson }}
-    };
-    
-    // Clear previous content
-    tableBody.innerHTML = '';
-    
-    // Add comparison rows
-    currentResult.classes.forEach((className, index) => {
-        const currentProb = currentResult.prediction.proba[index];
-        const previousProb = selectedResult.prediction.proba[index];
-        
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td><strong>${className}</strong></td>
-            <td>${(currentProb * 100).toFixed(2)}%</td>
-            <td>${(previousProb * 100).toFixed(2)}%</td>
-        `;
-        tableBody.appendChild(row);
-    });
-    
-    // Add summary row
-    const summaryRow = document.createElement('tr');
-    summaryRow.className = 'table-info';
-    summaryRow.innerHTML = `
-        <td><strong>Summary</strong></td>
-        <td><strong>Current: {{ prediction.label }}</strong></td>
-        <td><strong>Previous: ${selectedResult.prediction.label}</strong></td>
-    `;
-    tableBody.appendChild(summaryRow);
-    
-    comparisonTable.style.display = 'block';
 }
 
 // Create probability distribution chart
@@ -315,9 +271,8 @@ function createProbabilityChart() {
     const ctx = document.getElementById('probabilityChart');
     if (!ctx) return;
     
-    const classes = {{ classes|tojson }};
-    const probabilities = {{ prediction.proba|tojson }};
-    const predictedLabel = "{{ prediction.label }}";
+    const probabilities = prediction.proba;
+    const predictedLabel = prediction.label;
     
     // Color scheme - highlight the predicted class
     const colors = classes.map((className, index) => {

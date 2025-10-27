@@ -126,13 +126,18 @@ def predict():
     
     # Get classes from backend schema
     schema_data = get_backend_data('/schema')
+    logs = get_backend_data('/logs')
+    comparisons = []
+    for log in logs:
+        if log['model_name'] == model_name:
+            comparisons.append(log)
     classes = schema_data.get('classes', []) if schema_data else []
-    
     return render_template('prediction_result.html', 
                          model_name=model_name,
                          prediction=result['prediction'],
                          meta=result.get('meta', {}),
-                         classes=classes)
+                         classes=classes,
+                         comparisons=comparisons)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
