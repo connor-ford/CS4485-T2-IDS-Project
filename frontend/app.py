@@ -35,6 +35,20 @@ def post_backend_data(endpoint, data):
     except requests.exceptions.RequestException as e:
         flash(f"Error connecting to backend: {str(e)}", 'error')
         return None
+    
+def get_comparisons(model_name, filter_date=''):
+    logs = get_backend_data('/logs') or []
+    
+    comparisons = [log for log in logs if log.get('model_name') == model_name]
+
+    if filter_date:
+        filtered_comparisons = [
+            log for log in comparisons 
+            if filter_date in log["timestamp"]
+        ]
+        comparisons = filtered_comparisons
+        
+    return comparisons
 
 @app.route('/')
 def index():
@@ -137,7 +151,8 @@ def predict():
                          prediction=result['prediction'],
                          meta=result.get('meta', {}),
                          classes=classes,
-                         comparisons=comparisons)
+                         comparisons=comparisons,
+                         filter_date='')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)

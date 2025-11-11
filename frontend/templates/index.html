@@ -1,7 +1,5 @@
 {% extends "base.html" %}
 
-{% block title %}IDS Project - Home{% endblock %}
-
 {% block content %}
 <div class="row">
     <div class="col-lg-8 mx-auto">
@@ -37,12 +35,6 @@
             </div>
             {% endfor %}
         </div>
-
-        {% if not models %}
-        <div class="alert alert-warning text-center">
-            No models are currently available. Please ensure the backend service is running.
-        </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}

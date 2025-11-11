@@ -1,11 +1,10 @@
-/* Simple styles for IDS Project */
+
 
 body {
     font-family: Arial, sans-serif;
     background-color: #f8f9fa;
 }
 
-/* Basic card styling */
 .card {
     border: 1px solid #dee2e6;
     border-radius: 5px;
@@ -17,23 +16,16 @@ body {
     font-weight: 600;
 }
 
-/* Simple form styling */
 .form-control:focus {
     border-color: #0d6efd;
     box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
 }
 
-/* Basic button styling */
 .btn {
     border-radius: 4px;
 }
 
-/* Simple alert styling */
-.alert {
-    border-radius: 4px;
-}
 
-/* Code blocks */
 pre {
     background-color: #f8f9fa;
     border: 1px solid #e9ecef;

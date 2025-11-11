@@ -15,7 +15,6 @@
         </div>
 
         <div class="row">
-            <!-- Prediction Result -->
             <div class="col-lg-8 mb-4">
                 <div class="card">
                     <div class="card-header">
@@ -37,7 +36,6 @@
 
                         <hr>
 
-                        <!-- Probability Distribution Chart -->
                         <h6>Probability Distribution</h6>
                         <div class="mb-3">
                             <canvas id="probabilityChart" width="400" height="200"></canvas>
@@ -46,7 +44,6 @@
                 </div>
             </div>
 
-            <!-- Model Metadata -->
             <div class="col-lg-4">
                 <div class="card">
                     <div class="card-header">
@@ -65,16 +62,12 @@
                             <button class="btn btn-outline-primary btn-sm" onclick="downloadRawData()">
                                 Download Raw Data
                             </button>
-                            <button class="btn btn-outline-info btn-sm" onclick="showComparison()">
-                                Compare Results
-                            </button>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Current Results Table -->
         <div class="row mt-4">
             <div class="col-12">
                 <div class="card">
@@ -119,39 +112,36 @@
             </div>
         </div>
 
-        <!-- Results Comparison Section -->
-        <div class="row mt-4" id="comparisonSection" style="display: none;">
-            <div class="col-12">
-                <div class="card">
+        <div class="card">
                     <div class="card-header">
                         <h5>Results Comparison</h5>
                     </div>
                     <div class="card-body">
+                        
                         <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Select Previous Execution to Compare:</label>
-                                <select class="form-select" id="comparisonSelect">
-                                    <option value="">Choose a previous execution</option>
-                                        {% for prevExecution in comparisons %}
-                                        <option value="">{{ prevExecution.model_name }} - {{ prevExecution.timestamp }}</option>
-                                        {% endfor %}
-                                </select>
+                            <div class="col-md-12">
+                                <label for="comparisonDateFilter" class="form-label">Filter by Date (Client-Side):</label>
+                                <input type="date" class="form-control" 
+                                       id="comparisonDateFilter" 
+                                       onchange="filterComparisons(this.value)"
+                                       value="">
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <button type="button" class="btn btn-sm btn-outline-secondary w-100" onclick="resetFilter()">
+                                    Clear Filter
+                                </button>
                             </div>
                         </div>
                         
-                        <div id="comparisonTable" style="display: none;">
-                            <div class="table-responsive">
-                                <table class="table table-bordered">
-                                    <thead>
-                                        <tr>
-                                            <th>Class</th>
-                                            <th>Current Result</th>
-                                            <th>Previous Result</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="comparisonTableBody">
-                                    </tbody>
-                                </table>
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label for="comparisonSelect" class="form-label">Select Previous Execution:</label>
+                                <select class="form-select" id="comparisonSelect" onchange="loadComparisonResult(this.value)">
+                                    <option value=""></option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -179,13 +169,20 @@
 {% block scripts %}
 <script>
 
-// get result from render_template
+rawComparisons = JSON.parse('{{ comparisons | tojson | safe }}');
+let currentComparisons = [rawComparisons]; 
 var comparisons = JSON.parse('{{ comparisons | tojson}}')
 var prediction = JSON.parse('{{ prediction | tojson}}');
 var classes = JSON.parse('{{ classes | tojson}}');
 var modelName = "{{ model_name }}";
 console.log(comparisons)
-// Mock previous results data
+
+function formatDateToYMD(timestamp) {
+    if (!timestamp) return null;
+    const date = new Date(timestamp);
+    return date.toISOString().substring(0, 10);
+}
+
 const mockResults = {
     mock1: {
         model: 'XGBoost',
@@ -209,7 +206,7 @@ const mockResults = {
     }
 };
 
-// Set timestamp when page loads
+
 document.addEventListener('DOMContentLoaded', function() {
     const timestampElement = document.getElementById('timestamp');
     const rawDataDisplay = document.getElementById('rawDataDisplay');
@@ -219,7 +216,6 @@ document.addEventListener('DOMContentLoaded', function() {
         timestampElement.textContent = now.toLocaleString();
     }
     
-    // Update raw data display with model name and date
     if (rawDataDisplay) {
         const rawData = {
             model: modelName,
@@ -230,10 +226,44 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         rawDataDisplay.textContent = JSON.stringify(rawData, null, 2);
     }
-    
-    // Create probability distribution chart
+
     createProbabilityChart();
+    populateComparisonSelect(rawComparisons); 
 });
+
+function populateComparisonSelect(comparisonList) {
+    const select = document.getElementById('comparisonSelect');
+    const countSpan = document.getElementById('comparisonCount');
+    
+    select.innerHTML = `<option value=""></option>`;
+
+    comparisonList.forEach((prevExecution, index) => {
+        const option = document.createElement('option');
+        option.value = index; 
+        option.textContent = `${prevExecution.model_name} - ${prevExecution.timestamp}`;
+        option.dataset.timestamp = prevExecution.timestamp;
+        select.appendChild(option);
+    });
+}
+
+function filterComparisons(filterDate) {
+    document.getElementById('comparisonSelect').value = "";
+
+    if (!filterDate) {
+        currentComparisons = [rawComparisons];
+    } else {
+        currentComparisons = rawComparisons.filter(log => 
+            log.timestamp && formatDateToYMD(log.timestamp) === filterDate
+        );
+    }
+    
+    populateComparisonSelect(currentComparisons);
+}
+
+function resetFilter() {
+    document.getElementById('comparisonDateFilter').value = '';
+    filterComparisons('');
+}
 
 // Download raw data as JSON file
 function downloadRawData() {
@@ -256,17 +286,6 @@ function downloadRawData() {
     document.body.removeChild(link);
 }
 
-// Show comparison section
-function showComparison() {
-    const comparisonSection = document.getElementById('comparisonSection');
-    if (comparisonSection.style.display === 'none') {
-        comparisonSection.style.display = 'block';
-    } else {
-        comparisonSection.style.display = 'none';
-    }
-}
-
-// Create probability distribution chart
 function createProbabilityChart() {
     const ctx = document.getElementById('probabilityChart');
     if (!ctx) return;
@@ -274,7 +293,6 @@ function createProbabilityChart() {
     const probabilities = prediction.proba;
     const predictedLabel = prediction.label;
     
-    // Color scheme - highlight the predicted class
     const colors = classes.map((className, index) => {
         return className === predictedLabel ? '#28a745' : '#007bff';
     });
@@ -326,4 +344,3 @@ function createProbabilityChart() {
 }
 </script>
 {% endblock %}
-
