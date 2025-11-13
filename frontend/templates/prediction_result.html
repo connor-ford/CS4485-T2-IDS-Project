@@ -143,6 +143,24 @@
                         
                         <!-- Split View Container -->
                         <div id="splitViewContainer" class="d-none">
+                            <!-- Combined Comparison Chart -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <div class="card">
+                                        <div class="card-header bg-info text-white">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-chart-bar me-2"></i>Probability Distribution Comparison
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div style="position: relative; height: 400px; width: 100%;">
+                                                <canvas id="comparisonChart"></canvas>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <div class="row">
                                 <!-- Current Prediction -->
                                 <div class="col-md-6">
@@ -167,12 +185,6 @@
                                                 <div class="col-6">
                                                     <small class="text-muted">Confidence</small>
                                                     <div class="fw-bold" id="currentConfidence"></div>
-                                                </div>
-                                            </div>
-                                            <div class="mb-3">
-                                                <small class="text-muted">Probability Distribution</small>
-                                                <div style="position: relative; height: 250px; width: 100%;">
-                                                    <canvas id="currentChart"></canvas>
                                                 </div>
                                             </div>
                                             <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
@@ -214,12 +226,6 @@
                                                 <div class="col-6">
                                                     <small class="text-muted">Confidence</small>
                                                     <div class="fw-bold" id="comparisonConfidence"></div>
-                                                </div>
-                                            </div>
-                                            <div class="mb-3">
-                                                <small class="text-muted">Probability Distribution</small>
-                                                <div style="position: relative; height: 250px; width: 100%;">
-                                                    <canvas id="comparisonChart"></canvas>
                                                 </div>
                                             </div>
                                             <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
@@ -293,8 +299,7 @@ var prediction = JSON.parse('{{ prediction | tojson}}');
 var classes = JSON.parse('{{ classes | tojson}}');
 var modelName = "{{ model_name }}";
 
-// Chart instances for comparison
-let currentChartInstance = null;
+// Chart instance for comparison
 let comparisonChartInstance = null;
 
 function formatDateToYMD(timestamp) {
@@ -515,6 +520,9 @@ function loadComparisonResult(selectedIndex) {
         // Populate comparison prediction (right side)
         populateComparisonPrediction(selectedComparison);
         
+        // Create combined comparison chart
+        createCombinedComparisonChart(prediction, selectedComparison.prediction_result);
+        
         // Show comparison summary
         showComparisonSummary(prediction, selectedComparison.prediction_result);
     }, 50);
@@ -527,7 +535,7 @@ function populateCurrentPrediction() {
     document.getElementById('currentConfidence').textContent = 
         (Math.max(...prediction.proba) * 100).toFixed(2) + '%';
     
-    // Populate current table first (faster)
+    // Populate current table
     const tbody = document.getElementById('currentTableBody');
     tbody.innerHTML = '';
     const maxProb = Math.max(...prediction.proba);
@@ -542,11 +550,6 @@ function populateCurrentPrediction() {
         `;
         tbody.appendChild(row);
     });
-    
-    // Create current chart after table (prevents layout issues)
-    setTimeout(() => {
-        createComparisonChart('currentChart', prediction, 'primary', currentChartInstance);
-    }, 10);
 }
 
 function populateComparisonPrediction(comparison) {
@@ -570,7 +573,7 @@ function populateComparisonPrediction(comparison) {
     document.getElementById('comparisonConfidence').textContent = 
         (Math.max(...compPred.proba) * 100).toFixed(2) + '%';
     
-    // Populate comparison table first (faster)
+    // Populate comparison table
     const tbody = document.getElementById('comparisonTableBody');
     tbody.innerHTML = '';
     const maxProb = Math.max(...compPred.proba);
@@ -585,50 +588,54 @@ function populateComparisonPrediction(comparison) {
         `;
         tbody.appendChild(row);
     });
-    
-    // Create comparison chart after table (prevents layout issues)
-    setTimeout(() => {
-        createComparisonChart('comparisonChart', compPred, 'success', comparisonChartInstance);
-    }, 10);
 }
 
-function createComparisonChart(canvasId, predData, colorScheme, existingChart) {
-    const canvas = document.getElementById(canvasId);
+function createCombinedComparisonChart(currentPred, comparisonPred) {
+    const canvas = document.getElementById('comparisonChart');
     if (!canvas) return null;
     
     // Destroy existing chart if it exists
-    if (existingChart) {
-        existingChart.destroy();
+    if (comparisonChartInstance) {
+        comparisonChartInstance.destroy();
     }
     
-    const probabilities = predData.proba;
-    const predictedLabel = predData.label;
-    const colorMap = {
-        'primary': { main: '#0d6efd', highlight: '#0d6efd' },
-        'success': { main: '#198754', highlight: '#198754' }
-    };
-    const colors = colorMap[colorScheme] || colorMap.primary;
+    const currentProbs = currentPred.proba.map(p => parseFloat((p * 100).toFixed(1)));
+    const comparisonProbs = comparisonPred.proba.map(p => parseFloat((p * 100).toFixed(1)));
     
-    const chartColors = classes.map((className) => {
-        return className === predictedLabel ? colors.highlight : colors.main;
+    // Create colors for each dataset
+    const currentColors = classes.map((className) => {
+        return className === currentPred.label ? '#0d6efd' : '#6c9eff';
+    });
+    
+    const comparisonColors = classes.map((className) => {
+        return className === comparisonPred.label ? '#198754' : '#4caf50';
     });
     
     const chart = new Chart(canvas, {
         type: 'bar',
         data: {
             labels: classes,
-            datasets: [{
-                label: 'Probability',
-                data: probabilities.map(p => parseFloat((p * 100).toFixed(1))),
-                backgroundColor: chartColors,
-                borderColor: chartColors,
-                borderWidth: 1
-            }]
+            datasets: [
+                {
+                    label: 'Current Prediction',
+                    data: currentProbs,
+                    backgroundColor: currentColors,
+                    borderColor: '#0d6efd',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Previous Run',
+                    data: comparisonProbs,
+                    backgroundColor: comparisonColors,
+                    borderColor: '#198754',
+                    borderWidth: 1
+                }
+            ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: true,
-            aspectRatio: 2,
+            aspectRatio: 2.5,
             layout: {
                 padding: {
                     top: 10,
@@ -639,13 +646,21 @@ function createComparisonChart(canvasId, predData, colorScheme, existingChart) {
             },
             plugins: {
                 legend: {
-                    display: false
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 15,
+                        font: {
+                            size: 12
+                        }
+                    }
                 },
                 tooltip: {
                     enabled: true,
                     callbacks: {
                         label: function(context) {
-                            return context.parsed.y.toFixed(2) + '%';
+                            return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + '%';
                         }
                     }
                 }
@@ -693,11 +708,7 @@ function createComparisonChart(canvasId, predData, colorScheme, existingChart) {
     });
     
     // Store chart instance
-    if (canvasId === 'currentChart') {
-        currentChartInstance = chart;
-    } else if (canvasId === 'comparisonChart') {
-        comparisonChartInstance = chart;
-    }
+    comparisonChartInstance = chart;
     
     return chart;
 }
@@ -782,11 +793,7 @@ function hideComparisonView() {
     document.getElementById('splitViewContainer').classList.add('d-none');
     document.getElementById('emptyState').classList.remove('d-none');
     
-    // Destroy charts
-    if (currentChartInstance) {
-        currentChartInstance.destroy();
-        currentChartInstance = null;
-    }
+    // Destroy chart
     if (comparisonChartInstance) {
         comparisonChartInstance.destroy();
         comparisonChartInstance = null;
