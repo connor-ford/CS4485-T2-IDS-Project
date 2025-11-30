@@ -39,7 +39,7 @@ lccde:
 serve:
 	cd $(BACKEND) && IDSML_ARTIFACTS_DIR=$(PWD)/$(ARTIFACTS) $(PY) app.py
 
-frontend-serve:            # <--- added
+frontend-serve:           
 	cd $(FRONTEND) && venv/bin/python app.py
 
 # docker
