@@ -35,20 +35,6 @@ def post_backend_data(endpoint, data):
     except requests.exceptions.RequestException as e:
         flash(f"Error connecting to backend: {str(e)}", 'error')
         return None
-    
-def get_comparisons(model_name, filter_date=''):
-    logs = get_backend_data('/logs') or []
-    
-    comparisons = [log for log in logs if log.get('model_name') == model_name]
-
-    if filter_date:
-        filtered_comparisons = [
-            log for log in comparisons 
-            if filter_date in log["timestamp"]
-        ]
-        comparisons = filtered_comparisons
-        
-    return comparisons
 
 @app.route('/')
 def index():
@@ -153,6 +139,50 @@ def predict():
                          classes=classes,
                          comparisons=comparisons,
                          filter_date='')
+
+@app.route('/api/logs', methods=['GET'])
+def api_logs():
+    """API endpoint to get all prediction logs"""
+    logs = get_backend_data('/logs') or []
+    return jsonify(logs)
+
+@app.route('/api/schema', methods=['GET'])
+def api_schema():
+    """API endpoint to get schema information"""
+    schema_data = get_backend_data('/schema')
+    if not schema_data:
+        return jsonify({"error": "Unable to get schema"}), 500
+    return jsonify(schema_data)
+
+@app.route('/api/predict', methods=['POST'])
+def api_predict():
+    """API endpoint for JSON prediction requests (used by comparison feature)"""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+    
+    model_name = data.get('model')
+    inputs = data.get('inputs')
+    
+    if not model_name:
+        return jsonify({"error": "Model name is required"}), 400
+    if not inputs or not isinstance(inputs, dict):
+        return jsonify({"error": "Inputs object is required"}), 400
+    
+    # Make prediction request to backend
+    prediction_data = {
+        'model': model_name,
+        'inputs': inputs
+    }
+    
+    result = post_backend_data('/predict', prediction_data)
+    if result is None:
+        return jsonify({"error": "Failed to connect to backend"}), 500
+    
+    if 'error' in result:
+        return jsonify({"error": result['error']}), 400
+    
+    return jsonify(result)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
