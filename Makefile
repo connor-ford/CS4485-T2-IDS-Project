@@ -60,6 +60,5 @@ clean:
 schema:
 	@curl -s http://127.0.0.1:8000/schema | jq
 
-# run backend & frontend together
-dev:                        
-	$(MAKE) -j2 serve frontend-serve
+
+
