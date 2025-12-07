@@ -2,6 +2,7 @@
 PY=./.venv/bin/python
 PIP=./.venv/bin/pip
 BACKEND=backend
+FRONTEND=frontend          
 ARTIFACTS=$(BACKEND)/artifacts
 CONFIG=$(BACKEND)/training/config/cicids.yaml
 
@@ -11,6 +12,12 @@ init:
 		python3 -m venv .venv; \
 		$(PY) -m pip install -U pip setuptools wheel; \
 		$(PIP) install --only-binary=:all: -r requirements.txt
+
+frontend-init:             
+	cd $(FRONTEND); \
+		python3 -m venv venv; \
+		venv/bin/python -m pip install -U pip setuptools wheel; \
+		venv/bin/pip install -r requirements.txt
 
 # training
 train-all:
@@ -32,6 +39,9 @@ lccde:
 serve:
 	cd $(BACKEND) && IDSML_ARTIFACTS_DIR=$(PWD)/$(ARTIFACTS) $(PY) app.py
 
+frontend-serve:           
+	cd $(FRONTEND) && venv/bin/python app.py
+
 # docker
 docker-build:
 	docker build -t idsml-ide-backend:latest $(BACKEND)
@@ -47,6 +57,8 @@ clean:
 	rm -rf $(BACKEND)/.venv $(ARTIFACTS) __pycache__ $(BACKEND)/**/__pycache__
 
 # schema
-
 schema:
 	@curl -s http://127.0.0.1:8000/schema | jq
+
+
+

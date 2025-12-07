@@ -1,15 +1,25 @@
 import os
 import joblib
 from flask import Flask, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
 from models import MODEL_REGISTRY
 
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('IDSML_DATABASE_URI', 'sqlite:///idsml.db')
+db = SQLAlchemy(app)
 
 # where artifacts live; override with IDSML_ARTIFACTS_DIR
 ART_DIR = os.getenv(
     "IDSML_ARTIFACTS_DIR", os.path.join(os.path.dirname(__file__), "artifacts")
 )
 
+#define models
+class PredictionLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    model_name = db.Column(db.String(50), nullable=False)
+    input_data = db.Column(db.JSON, nullable=False)
+    prediction_result = db.Column(db.JSON, nullable=False)
+    timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
 
 @app.route("/health", methods=["GET"])
 def health():
@@ -41,6 +51,21 @@ def predict():
 
     try:
         pred, meta = runner.predict(inputs)
+        
+        #log the prediction
+        log_entry = PredictionLog(
+            model_name=model_name,
+            input_data=inputs,
+            prediction_result=pred
+        )
+        try:
+            db.session.add(log_entry)
+            db.session.commit()
+        
+        except Exception as e:
+            db.session.rollback()
+            print(f"Failed to log prediction: {e}")    #log this to a file or alert the dev
+
         return jsonify({"model": model_name, "prediction": pred, "meta": meta or {}})
     except Exception as e:
         return jsonify({"error": f"inference failed: {type(e).__name__}: {e}"}), 400
@@ -93,7 +118,20 @@ def schema_part(what: str):
         )
     return jsonify({what: joblib.load(path)})
 
+@app.route("/logs", methods=["GET"])
+def get_logs():
+    logs = PredictionLog.query.all()
+    return jsonify([{
+        "id": log.id,
+        "model_name": log.model_name,
+        "input_data": log.input_data,
+        "prediction_result": log.prediction_result,
+        "timestamp": log.timestamp
+    } for log in logs])
 
 if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()
+
     # dev only; container uses gunicorn
     app.run(host="0.0.0.0", port=8000, debug=True)

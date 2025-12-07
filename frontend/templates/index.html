@@ -1,7 +1,5 @@
 {% extends "base.html" %}
 
-{% block title %}IDS Project - Home{% endblock %}
-
 {% block content %}
 <div class="row">
     <div class="col-lg-8 mx-auto">
@@ -38,12 +36,430 @@
             {% endfor %}
         </div>
 
-        {% if not models %}
-        <div class="alert alert-warning text-center">
-            No models are currently available. Please ensure the backend service is running.
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Previous Execution Comparison</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Date Filter and Execution Selector -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="comparisonDateFilter" class="form-label">Filter by Date:</label>
+                                <input type="date" class="form-control" 
+                                       id="comparisonDateFilter" 
+                                       onchange="filterComparisons(this.value)"
+                                       value="">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="comparisonSelect" class="form-label">Select Previous Execution:</label>
+                                <select class="form-select" id="comparisonSelect" onchange="loadPreviousExecution(this.value)">
+                                    <option value="">Choose a previous execution...</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="resetFilter()">
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Editable Input Form (hidden until execution selected) -->
+                        <div id="editableInputsSection" style="display: none;">
+                            <hr>
+                            <h6>Modify Inputs</h6>
+                            <form id="modifiedInputsForm">
+                                <div class="row" id="editableInputsContainer">
+                                    <!-- Inputs will be dynamically generated here -->
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-md-12">
+                                        <button type="button" class="btn btn-primary" onclick="runModifiedPrediction()">
+                                            Run
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="resetInputs()">
+                                            Reset
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div id="comparisonResults" style="display: none;">
+                            <hr>
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <div style="height: 260px;">
+                                        <canvas id="comparisonChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="card border-primary">
+                                        <div class="card-header bg-primary text-white">
+                                            <h6 class="mb-0">Previous Execution</h6>
+                                            <small id="previousExecutionTimestamp"></small>
+                                        </div>
+                                        <div class="card-body" id="previousExecutionResults">
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- New Execution -->
+                                <div class="col-md-6">
+                                    <div class="card border-success">
+                                        <div class="card-header bg-success text-white">
+                                            <h6 class="mb-0">New Execution</h6>
+                                            <small id="newExecutionTimestamp"></small>
+                                        </div>
+                                        <div class="card-body" id="newExecutionResults">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        {% endif %}
+    </div>
+</div>
     </div>
 </div>
 {% endblock %}
 
+{% block scripts %}
+<script>
+let rawComparisons = [];
+let currentComparisons = [];
+let selectedPreviousExecution = null;
+let originalInputs = null;
+let classes = [];
+let BACKEND_URL = 'http://localhost:8000';
+let comparisonChart = null;
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadComparisonData();
+});
+
+// Load logs and schema from backend
+async function loadComparisonData() {
+    try {
+        // Fetch logs
+        const logsResponse = await fetch('/api/logs');
+        if (logsResponse.ok) {
+            rawComparisons = await logsResponse.json();
+            currentComparisons = rawComparisons;
+            populateComparisonSelect(rawComparisons);
+        }
+        const schemaResponse = await fetch('/api/schema');
+        if (schemaResponse.ok) {
+            const schema = await schemaResponse.json();
+            classes = schema.classes || [];
+        }
+    } catch (error) {
+        console.error('Error loading comparison data:', error);
+    }
+}
+
+function formatDateToYMD(timestamp) {
+    if (!timestamp) return null;
+    const date = new Date(timestamp);
+    return date.toISOString().substring(0, 10);
+}
+
+function populateComparisonSelect(comparisonList) {
+    const select = document.getElementById('comparisonSelect');
+    select.innerHTML = '<option value="">Choose a previous execution...</option>';
+
+    comparisonList.forEach((prevExecution, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        const timestamp = prevExecution.timestamp || 'Unknown date';
+        option.textContent = `${prevExecution.model_name || 'Unknown'} - ${timestamp}`;
+        option.dataset.timestamp = timestamp;
+        select.appendChild(option);
+    });
+}
+
+function filterComparisons(filterDate) {
+    document.getElementById('comparisonSelect').value = "";
+    document.getElementById('editableInputsSection').style.display = 'none';
+    document.getElementById('comparisonResults').style.display = 'none';
+    selectedPreviousExecution = null;
+
+    if (!filterDate) {
+        currentComparisons = rawComparisons;
+    } else {
+        currentComparisons = rawComparisons.filter(log => 
+            log.timestamp && formatDateToYMD(log.timestamp) === filterDate
+        );
+    }
+    
+    populateComparisonSelect(currentComparisons);
+}
+
+function resetFilter() {
+    document.getElementById('comparisonDateFilter').value = '';
+    filterComparisons('');
+}
+
+function formatDisplayTimestamp(value) {
+    if (!value) return 'Unknown';
+    const date = new Date(value);
+    if (isNaN(date.getTime())) {
+        return value;
+    }
+    return date.toLocaleString();
+}
+
+function loadPreviousExecution(index) {
+    if (!index || index === '') {
+        document.getElementById('editableInputsSection').style.display = 'none';
+        document.getElementById('comparisonResults').style.display = 'none';
+        selectedPreviousExecution = null;
+        return;
+    }
+
+    const execution = currentComparisons[index];
+    if (!execution) return;
+
+    selectedPreviousExecution = execution;
+    originalInputs = JSON.parse(JSON.stringify(execution.input_data || {})); // Deep copy
+    
+    // Show editable inputs section
+    const container = document.getElementById('editableInputsContainer');
+    container.innerHTML = '';
+    
+    // Get feature names from input_data
+    const features = Object.keys(execution.input_data || {});
+    
+    if (features.length === 0) {
+        container.innerHTML = '<div class="col-12"><p class="text-muted">No input data available for this execution.</p></div>';
+        return;
+    }
+    
+    features.forEach(feature => {
+        const value = execution.input_data[feature];
+        const col = document.createElement('div');
+        col.className = 'col-md-6 mb-3';
+        col.innerHTML = `
+            <label for="input_${feature}" class="form-label">${feature}</label>
+            <input type="number" 
+                   class="form-control" 
+                   id="input_${feature}" 
+                   name="input_${feature}"
+                   value="${value}"
+                   step="any"
+                   required>
+        `;
+        container.appendChild(col);
+    });
+    
+    document.getElementById('editableInputsSection').style.display = 'block';
+    document.getElementById('comparisonResults').style.display = 'none';
+}
+
+function resetInputs() {
+    if (!selectedPreviousExecution || !originalInputs) return;
+    
+    Object.keys(originalInputs).forEach(feature => {
+        const input = document.getElementById(`input_${feature}`);
+        if (input) {
+            input.value = originalInputs[feature];
+        }
+    });
+}
+
+async function runModifiedPrediction() {
+    if (!selectedPreviousExecution) {
+        return;
+    }
+
+    // Collect modified inputs
+    const modifiedInputs = {};
+    const inputs = document.querySelectorAll('#editableInputsContainer input');
+    
+    inputs.forEach(input => {
+        const featureName = input.id.replace('input_', '');
+        const value = parseFloat(input.value);
+        if (isNaN(value)) {
+            return;
+        }
+        modifiedInputs[featureName] = value;
+    });
+
+    // Show loading state
+    const runButton = event.target;
+    const originalText = runButton.textContent;
+    runButton.disabled = true;
+    runButton.textContent = 'Running Prediction...';
+
+    try {
+        // Call backend API to get prediction
+        const response = await fetch('/api/predict', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model: selectedPreviousExecution.model_name,
+                inputs: modifiedInputs
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Prediction failed');
+        }
+
+        const result = await response.json();
+        
+        if (result.error) {
+            return;
+        }
+
+        // Display side-by-side comparison
+        displayComparison(selectedPreviousExecution, {
+            prediction: result.prediction,
+            inputs: modifiedInputs,
+            timestamp: new Date().toISOString()
+        });
+
+    } catch (error) {
+        console.error('Error running prediction:', error);
+    } finally {
+        runButton.disabled = false;
+        runButton.textContent = originalText;
+    }
+}
+
+function displayComparison(previousExecution, newExecution) {
+    const prevPrediction = previousExecution.prediction_result || {};
+    
+    // Prepare data for grouped bar chart similar to prediction results
+    const prevProbs = prevPrediction.proba || [];
+    const newProbs = newExecution.prediction.proba || [];
+    const labels = classes.length ? classes : prevProbs.map((_, idx) => `Class ${idx + 1}`);
+
+    const prevPercentages = labels.map((_, idx) => (prevProbs[idx] || 0) * 100);
+    const newPercentages = labels.map((_, idx) => (newProbs[idx] || 0) * 100);
+
+    // Render grouped bar chart comparing probability distributions
+    const chartCanvas = document.getElementById('comparisonChart');
+    if (chartCanvas) {
+        const ctx = chartCanvas.getContext('2d');
+        if (comparisonChart) {
+            comparisonChart.destroy();
+        }
+        comparisonChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Previous',
+                    data: prevPercentages,
+                    backgroundColor: '#0d6efd',
+                    borderColor: '#0d6efd',
+                    borderWidth: 1
+                }, {
+                    label: 'New',
+                    data: newPercentages,
+                    backgroundColor: '#198754',
+                    borderColor: '#198754',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Probability'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Display previous execution
+    const prevContainer = document.getElementById('previousExecutionResults');
+    prevContainer.innerHTML = `
+        <h6>Predicted Label: <span class="badge bg-primary">${prevPrediction.label || 'N/A'}</span></h6>
+        <h6>Confidence: ${prevPrediction.proba ? (Math.max(...prevPrediction.proba) * 100).toFixed(2) : 'N/A'}%</h6>
+        <hr>
+        <h6>Probabilities:</h6>
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Class</th>
+                    <th>Probability</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${prevPrediction.proba ? prevPrediction.proba.map((prob, idx) => `
+                    <tr>
+                        <td>${classes[idx] || 'N/A'}</td>
+                        <td>${(prob * 100).toFixed(2)}%</td>
+                    </tr>
+                `).join('') : '<tr><td colspan="2">No data</td></tr>'}
+            </tbody>
+        </table>
+        <hr>
+        <h6>Inputs Used:</h6>
+        <pre class="bg-light p-2 rounded small">${JSON.stringify(previousExecution.input_data || {}, null, 2)}</pre>
+    `;
+    document.getElementById('previousExecutionTimestamp').textContent = formatDisplayTimestamp(previousExecution.timestamp);
+
+    // Display new execution
+    const newContainer = document.getElementById('newExecutionResults');
+    newContainer.innerHTML = `
+        <h6>Predicted Label: <span class="badge bg-success">${newExecution.prediction.label || 'N/A'}</span></h6>
+        <h6>Confidence: ${newExecution.prediction.proba ? (Math.max(...newExecution.prediction.proba) * 100).toFixed(2) : 'N/A'}%</h6>
+        <hr>
+        <h6>Probabilities:</h6>
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Class</th>
+                    <th>Probability</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${newExecution.prediction.proba ? newExecution.prediction.proba.map((prob, idx) => `
+                    <tr>
+                        <td>${classes[idx] || 'N/A'}</td>
+                        <td>${(prob * 100).toFixed(2)}%</td>
+                    </tr>
+                `).join('') : '<tr><td colspan="2">No data</td></tr>'}
+            </tbody>
+        </table>
+        <hr>
+        <h6>Inputs Used:</h6>
+        <pre class="bg-light p-2 rounded small">${JSON.stringify(newExecution.inputs, null, 2)}</pre>
+    `;
+    document.getElementById('newExecutionTimestamp').textContent = formatDisplayTimestamp(newExecution.timestamp);
+
+    // Show comparison section
+    document.getElementById('comparisonResults').style.display = 'block';
+    document.getElementById('comparisonResults').scrollIntoView({ behavior: 'smooth' });
+}
+</script>
+{% endblock %}
